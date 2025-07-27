@@ -3,7 +3,7 @@ import time
 import zarr
 import torch
 
-from ..src.visuomotor.dataset.push_t_dataset import PushTImageDataset
+from visuomotor.dataset.push_t_dataset import PushTImageDataset
 
 
 def main():
@@ -15,7 +15,7 @@ def main():
     stats = PushTImageDataset.calculate_train_stats(dataset_root, data_split["train"])
 
     for split_type, split_indexes in data_split.items():
-        
+
         dataset = PushTImageDataset(
             dataset_root=dataset_root,
             split_indexes=split_indexes,
