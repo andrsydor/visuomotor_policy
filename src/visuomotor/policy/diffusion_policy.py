@@ -79,6 +79,18 @@ class DiffusionPolicy2:
           sample=naction
           ).prev_sample
     return naction
+  
+  def compute_train_loss(self, images: torch.Tensor, poses: torch.Tensor, target_actions: torch.Tensor) -> torch.Tensor:
+    batch_size = images.shape[0]
+    device = images.device
+
+    t = self.sample_t(batch_size)
+    noise = torch.randn(target_actions.shape, device=device)
+    noisy_actions = self.forward_process(target_actions, noise, t)
+    noise_pred = self.predict_noise(images, poses, noisy_actions, t)
+    loss = nn.functional.mse_loss(noise_pred, noise)
+
+    return loss
 
   @staticmethod
   def from_ema(config, device, ema):
