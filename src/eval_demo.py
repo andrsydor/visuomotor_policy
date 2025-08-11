@@ -15,7 +15,7 @@ from visuomotor.dataset.tool import normalize_data, unnormalize_data
 
 def main():
 
-    CHECKPOINT = "DP_ema_100_ep_100_data_1753629063.ckpt"
+    CHECKPOINT = "test_dp_100_ep1754215304.ckpt"
     PATH_TO_STORAGE = "/home/andriisydor/masters_thesis/visuomotor_policy/checkpoints"
     PATH_TO_VIDEOS = "/home/andriisydor/masters_thesis/visuomotor_policy/video"
     PATH_TO_CHECKPOINT = os.path.join(PATH_TO_STORAGE, CHECKPOINT)
@@ -32,7 +32,7 @@ def main():
     dataset_root = zarr.open(PATH_TO_DATA, 'r')
     stats = PushTImageDataset.calculate_train_stats(dataset_root, data_split["train"])
 
-    seeds = list(range(100000, 100002))
+    seeds = list(range(100000, 100010))
     episode_rewards = []
     for seed in seeds:
         # limit enviornment interaction to 200 steps before termination

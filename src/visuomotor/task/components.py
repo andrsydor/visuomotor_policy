@@ -2,6 +2,7 @@ from typing import Type
 
 from visuomotor.dataset.dataset_base import DatasetBase
 from visuomotor.dataset.push_t_dataset import PushTImageDataset
+from visuomotor.dataset.bathroom_dataset import BathroomDataset
 
 
 class Task:
@@ -16,8 +17,15 @@ class PushTTask(Task):
         return PushTImageDataset
     
 
+class SeatDownTask(Task):
+    @staticmethod
+    def dataset_class():
+        return BathroomDataset
+    
+
 TASKS = {
-    "push_t": PushTTask
+    "push_t": PushTTask,
+    "seat_down": SeatDownTask
 }
 
 

@@ -49,9 +49,8 @@ def main():
         t1 = time.time()
         print(f"--- {split_type} ---")
         print(t1 - t0)
-        print("image.shape:", batch['image'].shape)
-        print("agent_pos.shape:", batch['agent_pos'].shape)
-        print("action.shape", batch['action'].shape)
+        for key, item in batch.items():
+            print(f"{key}.shape:", item.shape)
         print()
 
 
