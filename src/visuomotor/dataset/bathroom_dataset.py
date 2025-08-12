@@ -3,7 +3,8 @@ from typing import Dict, List
 import torch
 import numpy as np
 
-from visuomotor.dataset.tool import normalize_data, create_sample_indices, sample_sequence, get_data_stats
+from visuomotor.dataset.tool import normalize_data, get_data_stats
+from visuomotor.dataset.tool2 import get_lazy_sample, sample_indices
 
 
 class BathroomDataset(torch.utils.data.Dataset):
@@ -16,36 +17,35 @@ class BathroomDataset(torch.utils.data.Dataset):
             action_horizon: int,
             stats: Dict[str, np.array]
     ):
+        self.image_keys = ["realsense", "depth_camera"]
 
         realsense_data = dataset_root['data']['realsense']
-        # realsense_data = np.moveaxis(realsense_data, -1, 1)  # TODO: refactor
-
         depth_data = dataset_root['data']['depth_camera']
-        # depth_data = np.moveaxis(realsense_data, -1, 1)  # TODO: refactor
         
         train_data = {
-            'wrist_pos': dataset_root['data']['wrist'][:],
-            'action': np.concat((dataset_root["data"]["wrist"][1:], dataset_root["data"]["wrist"][-1:]), axis=0)  # state but shifter forward
+            'wrist_pos': BathroomDataset._get_wrist_pos(dataset_root),
+            'action_pos': BathroomDataset._get_action_pos(dataset_root)
         }
 
-        normalized_train_data = dict()
+        normalized_train_data = {
+            'realsense': realsense_data,
+            'depth_camera': depth_data,
+            'wrist_rot': BathroomDataset._get_wrist_rot(dataset_root),
+            'action_rot': BathroomDataset._get_action_rot(dataset_root)
+        }
+    
         for key, data in train_data.items():
             normalized_train_data[key] = normalize_data(data, stats[key])
 
-        # TODO: check if normalized images
-        normalized_train_data['realsense'] = realsense_data
-        normalized_train_data['depth_camera'] = depth_data
-
         episode_ends = dataset_root['meta']['episode_ends'][:]
 
-        # compute start and end of each state-action sequence
-        # also handles padding
-        indices = create_sample_indices(
+        indices = sample_indices(
             episode_ends=episode_ends,
             split_indexes=split_indexes,
             sequence_length=pred_horizon,
             pad_before=obs_horizon-1,
-            pad_after=action_horizon-1)
+            pad_after=action_horizon-1
+        )
 
         self.indices = indices
         self.stats = stats
@@ -53,29 +53,43 @@ class BathroomDataset(torch.utils.data.Dataset):
         self.pred_horizon = pred_horizon
         self.action_horizon = action_horizon
         self.obs_horizon = obs_horizon
+    
+    @staticmethod
+    def _get_wrist_pos(dataset_root):
+        return dataset_root['data']['wrist_pos'][:]
+    
+    @staticmethod
+    def _get_wrist_rot(dataset_root):
+        return dataset_root['data']['wrist_rot'][:]
+    
+    @staticmethod
+    def _get_action_pos(dataset_root):
+        return np.concat((dataset_root["data"]["wrist_pos"][1:], dataset_root["data"]["wrist_pos"][-1:]), axis=0)  # state but shifter forward
+
+    @staticmethod
+    def _get_action_rot(dataset_root):
+        return np.concat((dataset_root["data"]["wrist_rot"][1:], dataset_root["data"]["wrist_rot"][-1:]), axis=0)  # state but shifter forward
 
     def __len__(self):
         return len(self.indices)
 
     def __getitem__(self, idx):
         # get the start/end indices for this datapoint
-        buffer_start_idx, buffer_end_idx, \
-            sample_start_idx, sample_end_idx = self.indices[idx]
+        buffer_start_idx, buffer_end_idx, sample_start_idx, sample_end_idx = self.indices[idx]
 
-        # get nomralized data using these indices
-        nsample = sample_sequence(  # TODO: optimize
+        nsample = get_lazy_sample(
             train_data=self.normalized_train_data,
             sequence_length=self.pred_horizon,
             buffer_start_idx=buffer_start_idx,
             buffer_end_idx=buffer_end_idx,
             sample_start_idx=sample_start_idx,
-            sample_end_idx=sample_end_idx
+            sample_end_idx=sample_end_idx,
+            image_keys=self.image_keys,
+            obs_horizon=self.obs_horizon
         )
 
-        # discard unused observations
-        nsample['realsense'] = nsample['realsense'][:self.obs_horizon,:]
-        nsample['depth_camera'] = nsample['depth_camera'][:self.obs_horizon,:]
         nsample['wrist_pos'] = nsample['wrist_pos'][:self.obs_horizon,:]
+        nsample['wrist_rot'] = nsample['wrist_rot'][:self.obs_horizon,:]
         return nsample
 
     @staticmethod
@@ -93,9 +107,12 @@ class BathroomDataset(torch.utils.data.Dataset):
     @staticmethod
     def calculate_train_stats(dataset_root, split_indexes):
         episode_ends = dataset_root['meta']['episode_ends'][:]
+
+        n_wrist_pos = BathroomDataset._get_wrist_pos(dataset_root)
+        n_action_pos = BathroomDataset._get_action_pos(dataset_root)
         train_stats = {
-            'wrist_pos': BathroomDataset.calculate_stats(dataset_root['data']['wrist'][:], episode_ends, split_indexes),
-            'action': BathroomDataset.calculate_stats(np.concat((dataset_root["data"]["wrist"][1:], dataset_root["data"]["wrist"][-1:]), axis=0), episode_ends, split_indexes)  # TODO: remove code copy
+            'wrist_pos': BathroomDataset.calculate_stats(n_wrist_pos, episode_ends, split_indexes),
+            'action_pos': BathroomDataset.calculate_stats(n_action_pos, episode_ends, split_indexes)
         }
         return train_stats
     

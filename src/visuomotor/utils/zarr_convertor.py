@@ -30,7 +30,7 @@ def convert(path_to_dataset: str, ouput_file_path: str) -> None:
         camera_name = os.path.splitext(image_name)[0]
         arr = data_group.create_dataset(
             name=camera_name,
-            shape=(0, height, width, channels),
+            shape=(0, channels, height, width),
             dtype="float32"
         )
         camera_arrays.append(arr)
@@ -41,9 +41,15 @@ def convert(path_to_dataset: str, ouput_file_path: str) -> None:
         dtype="float32"
     )
 
-    wrist_array = data_group.create_dataset(
-        name="wrist",
-        shape=(0, 12),
+    wrist_pos_array = data_group.create_dataset(
+        name="wrist_pos",
+        shape=(0, 3),
+        dtype="float32"
+    )
+
+    wrist_rot_array = data_group.create_dataset(
+        name="wrist_rot",
+        shape=(0, 9),
         dtype="float32"
     )
 
@@ -67,6 +73,7 @@ def convert(path_to_dataset: str, ouput_file_path: str) -> None:
                 image_path = os.path.join(sample_dir_path, image_name)
                 pil_image = Image.open(image_path).resize((width, height), resample=Image.Resampling.BICUBIC)
                 np_image = np.array(pil_image)
+                np_image = np.transpose(np_image, (2, 0, 1))
                 np_image = np_image / 255.0
                 np_image = np.expand_dims(np_image, axis=0)
                 camera_arrays[camera_i].append(np_image)
@@ -80,9 +87,12 @@ def convert(path_to_dataset: str, ouput_file_path: str) -> None:
                 joint_array.append(np_joint_pos)
                 
                 wrist_pos, wrist_rot = fk(joint_angles)
-                wrist = np.concat((wrist_pos, wrist_rot.as_matrix().flatten()))
-                wrist = np.expand_dims(wrist, axis=0)
-                wrist_array.append(wrist)
+                
+                np_wrist_pos = np.expand_dims(wrist_pos, axis=0)
+                wrist_pos_array.append(np_wrist_pos)
+
+                np_wrist_rot = np.expand_dims(wrist_rot.as_matrix().flatten(), axis=0)
+                wrist_rot_array.append(np_wrist_rot)
         
         assert camera_arrays[0].shape[0] == joint_array.shape[0]
         episode_ends.append(joint_array.shape[0])
