@@ -15,12 +15,13 @@ class DiffusionPolicy2:
     vision_encoder = get_resnet('resnet18')
     vision_encoder = replace_bn_with_gn(vision_encoder)
 
-    vision_feature_dim = 512
-    obs_dim = vision_feature_dim + config.pos_dim
+    vision_feature_dim = 512 * config.image_obs_horizon
+    agent_pos_dim = config.pos_dim  * config.obs_horizon
+    obs_dim = vision_feature_dim + agent_pos_dim
 
     noise_pred_net = ConditionalUnet1D(
         input_dim=config.action_dim,
-        global_cond_dim=(obs_dim * config.obs_horizon)
+        global_cond_dim=obs_dim
     )
 
     self.nets = nn.ModuleDict({
@@ -42,7 +43,7 @@ class DiffusionPolicy2:
     return torch.randn(
         (batch_size, self.config.pred_horizon, self.config.action_dim),
         device=self.device
-        )
+    )
 
   def sample_t(self, batch_size):
     return torch.randint(0, self.noise_scheduler.config.num_train_timesteps,
@@ -81,8 +82,8 @@ class DiffusionPolicy2:
     return naction
   
   def compute_train_loss(self, images: torch.Tensor, poses: torch.Tensor, target_actions: torch.Tensor) -> torch.Tensor:
-    batch_size = images.shape[0]
-    device = images.device
+    batch_size = poses.shape[0]
+    device = poses.device
 
     t = self.sample_t(batch_size)
     noise = torch.randn(target_actions.shape, device=device)
