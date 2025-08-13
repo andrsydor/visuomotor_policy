@@ -118,16 +118,17 @@ def main():
             mean_loss = np.mean(epoch_loss)
             epoch_losses.append(mean_loss)
             tepochs.set_postfix(loss=np.mean(mean_loss))
-            validation_loss = validate_model(policy, validation_dataloader, CONFIG, DEVICE)
-            validation_losses.append(validation_loss)
-            print(f'epoch {epoch_i}: train_loss={mean_loss}, validation_loss={validation_loss}')
+            # validation_loss = validate_model(policy, validation_dataloader, CONFIG, DEVICE)
+            # validation_losses.append(validation_loss)
+            # print(f'epoch {epoch_i}: train_loss={mean_loss}, validation_loss={validation_loss}')
+            print(f'epoch {epoch_i}: train_loss={mean_loss}')
 
     ema_policy = policy_class.from_ema(CONFIG, DEVICE, ema)
     save_model(ema_policy.nets, PATH_TO_STORAGE, NAME_TO_SAVE)
     print(f'saved as {NAME_TO_SAVE}')
-    draw_chart(epoch_losses, validation_losses)  # TODO: save the chart
-    print('test noise MSE: ', validate_model(policy, test_dataloader, CONFIG, DEVICE, nn.functional.mse_loss))
-    print('test noise MAE: ', validate_model(policy, test_dataloader, CONFIG, DEVICE, nn.functional.l1_loss))
+    # draw_chart(epoch_losses, validation_losses)  # TODO: save the chart
+    # print('test noise MSE: ', validate_model(policy, test_dataloader, CONFIG, DEVICE, nn.functional.mse_loss))
+    # print('test noise MAE: ', validate_model(policy, test_dataloader, CONFIG, DEVICE, nn.functional.l1_loss))
 
 
 if __name__ == "__main__":
