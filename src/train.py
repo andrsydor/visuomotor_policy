@@ -9,13 +9,14 @@ from diffusers.optimization import get_scheduler
 import numpy as np
 from tqdm.auto import tqdm
 
-from visuomotor.config.diffusion_policy_config import DiffusionPolicyConfig
-from visuomotor.policy.diffusion_policy import DiffusionPolicy2
+from visuomotor.config.diffusion_policy_config import DiffusionPolicyConfig, DiffusionPolicy2CamConfig
+from visuomotor.policy.diffusion_policy import DiffusionPolicy2, DiffusionPolicy2Cam
 from visuomotor.pipeline.tools import validate_model, draw_chart, save_model, create_dataloaders
 
 
 POLICIES = {
-    "dp": (DiffusionPolicy2, DiffusionPolicyConfig)
+    "dp": (DiffusionPolicy2, DiffusionPolicyConfig),
+    "dp2cam": (DiffusionPolicy2Cam, DiffusionPolicy2CamConfig)
 }
 
 
@@ -86,12 +87,22 @@ def main():
             with tqdm(train_dataloader, desc='Batch', leave=False) as tepoch:
                 for nbatch in tepoch:
 
-                    # TODO: pass the dictionary
-                    images = nbatch['image'].float().to(DEVICE)
-                    poses = nbatch['agent_pos'].float().to(DEVICE)
-                    target_actions = nbatch['action'].float().to(DEVICE)
+                    # TODO: generalize this
+                    # images = nbatch['image'].float().to(DEVICE)
+                    # poses = nbatch['agent_pos'].float().to(DEVICE)
+                    # target_actions = nbatch['action'].float().to(DEVICE)
 
-                    loss = policy.compute_train_loss(images, poses, target_actions)
+                    # TODO: test this
+                    arm_images = nbatch['realsense'].float().to(DEVICE)
+                    depth_images = nbatch['depth_camera'].float().to(DEVICE)
+
+                    poses = torch.cat([nbatch["wrist_pos"], nbatch["wrist_rot"]], dim=2)
+                    poses = poses.float().to(DEVICE)
+
+                    target_actions = torch.cat([nbatch["action_pos"], nbatch["action_rot"]], dim=2)
+                    target_actions = target_actions.float().to(DEVICE)
+
+                    loss = policy.compute_train_loss(arm_images, depth_images, poses, target_actions)
 
                     loss.backward()
 

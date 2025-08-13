@@ -7,4 +7,3 @@ class BasePolicyConfig:
 
     self.action_dim = 2
     self.pos_dim = 2
-    self.image_obs_horizon = self.obs_horizon
