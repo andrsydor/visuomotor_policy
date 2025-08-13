@@ -19,8 +19,8 @@ class BathroomDataset(torch.utils.data.Dataset):
     ):
         self.image_keys = ["realsense", "depth_camera"]
 
-        realsense_data = dataset_root['data']['realsense']
-        depth_data = dataset_root['data']['depth_camera']
+        realsense_data = dataset_root['data']['realsense'][:]
+        depth_data = dataset_root['data']['depth_camera'][:]
         
         train_data = {
             'wrist_pos': BathroomDataset._get_wrist_pos(dataset_root),
