@@ -108,7 +108,7 @@ class DiffusionPolicy2Cam:
 
     assert self.config.image_obs_horizon == 1
 
-    vision_encoder = get_resnet('resnet18')
+    vision_encoder = get_resnet('resnet34')
     vision_encoder = replace_bn_with_gn(vision_encoder)
 
     vision_feature_dim = 512 * config.image_obs_horizon * 2  # 2 cams
