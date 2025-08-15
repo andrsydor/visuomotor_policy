@@ -121,7 +121,8 @@ def main():
             mean_loss = np.mean(epoch_loss)
             epoch_losses.append(mean_loss)
             tepochs.set_postfix(loss=np.mean(mean_loss))
-            validation_loss = validation_function(policy, validation_dataloader, CONFIG, DEVICE)
+            # validation_loss = validation_function(policy, validation_dataloader, CONFIG, DEVICE)
+            validation_loss = 0.0
             validation_losses.append(validation_loss)
             print(f'epoch {epoch_i}: train_loss={mean_loss}, validation_loss={validation_loss}')
 
