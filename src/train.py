@@ -38,6 +38,7 @@ def main():
     parser.add_argument("--epochs", type=int, help="Number of epochs")
     parser.add_argument("--batch_size", type=int, help="Batch_size")
     parser.add_argument("--policy", help="Policy name")
+    parser.add_argument("--intermediate", type=int, nargs="+", help="List of intermediate checkpoints to be saved (epoch_i + 1)")
     args = parser.parse_args()
 
     PATH_TO_DATA = args.dataset
@@ -46,6 +47,7 @@ def main():
     NAME_TO_SAVE = args.name + str(int(time.time()))
     BATCH_SIZE = args.batch_size
     EPOCHS = args.epochs
+    INTERMEDIATE = args.intermediate
 
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -123,8 +125,13 @@ def main():
             validation_losses.append(validation_loss)
             print(f'epoch {epoch_i}: train_loss={mean_loss}, validation_loss={validation_loss}')
 
+            if (epoch_i + 1) in INTERMEDIATE:
+                ema_policy = policy_class.from_ema(CONFIG, DEVICE, ema)
+                save_model(ema_policy.nets, PATH_TO_STORAGE, NAME_TO_SAVE + f"_{epoch_i + 1}")
+                print(f'saved intermediate as {NAME_TO_SAVE}')
+
     ema_policy = policy_class.from_ema(CONFIG, DEVICE, ema)
-    save_model(ema_policy.nets, PATH_TO_STORAGE, NAME_TO_SAVE)
+    save_model(ema_policy.nets, PATH_TO_STORAGE, NAME_TO_SAVE + "_final")
     print(f'saved as {NAME_TO_SAVE}')
 
     test_mse = validation_function(policy, test_dataloader, CONFIG, DEVICE, nn.functional.mse_loss)
