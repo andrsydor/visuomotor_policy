@@ -8,7 +8,7 @@ from scipy.spatial.transform import Rotation
 from visuomotor.dataset.bathroom_dataset import BathroomDataset
 from visuomotor.config.diffusion_policy_config import DiffusionPolicy2CamConfig
 from visuomotor.policy.diffusion_policy import DiffusionPolicy2Cam
-from visuomotor.dataset.tool import normalize_data, unnormalize_data
+from visuomotor.dataset.tool import MinMaxNormalizer
 
 
 def symmetric_orthogonalization(x):
@@ -37,6 +37,7 @@ def main():
 
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
     CONFIG = DiffusionPolicy2CamConfig()
+    NORMALIZER = MinMaxNormalizer
 
     state_dict = torch.load(PATH_TO_CHECKPOINT, map_location='cuda')
     ema_policy = DiffusionPolicy2Cam(CONFIG, DEVICE)
@@ -44,7 +45,7 @@ def main():
 
     data_split = BathroomDataset.default_dataset_split()
     dataset_root = zarr.open(PATH_TO_DATA, 'r')
-    stats = BathroomDataset.calculate_train_stats(dataset_root, data_split["train"])
+    stats = BathroomDataset.calculate_train_stats(dataset_root, data_split["train"], NORMALIZER)
     print(stats)
 
     val_dataset = BathroomDataset(
@@ -53,7 +54,8 @@ def main():
         pred_horizon=16,
         obs_horizon=2,
         action_horizon=8,
-        stats=stats
+        stats=stats,
+        normalizer=NORMALIZER
     )
 
     elem = val_dataset[0]
@@ -81,7 +83,7 @@ def main():
     
 
     # unnormalize action
-    print(unnormalize_data(elem["wrist_pos"], stats=stats['wrist_pos']))
+    print(NORMALIZER.unnormalize_data(elem["wrist_pos"], stats=stats['wrist_pos']))
 
     naction = naction.detach().to('cpu').numpy()
 
@@ -89,7 +91,7 @@ def main():
     action_pos = naction[0, :, :3]  # (pred_horizon, 3)
     action_rot = naction[0, :, 3:]  # (pred_horizon, 9)
 
-    action_pos_pred = unnormalize_data(action_pos, stats=stats['action_pos'])
+    action_pos_pred = NORMALIZER.unnormalize_data(action_pos, stats=stats['action_pos'])
     action_rot_pred = symmetric_orthogonalization(torch.tensor(action_rot)).numpy()
     print(action_pos_pred)
     print(action_rot_pred)

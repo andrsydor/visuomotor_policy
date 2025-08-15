@@ -4,7 +4,7 @@ import argparse
 import zarr
 import torch
 
-from visuomotor.dataset.push_t_dataset import PushTImageDataset
+from visuomotor.dataset.tool import MinMaxNormalizer, PercentileNormalizer
 from visuomotor.task.components import task_from_string
 
 
@@ -17,13 +17,14 @@ def main():
     PATH_TO_DATA = args.dataset
     TASK_NAME = args.task
     BATCH_SIZE = 64
+    NORMALIZER = PercentileNormalizer
 
     task_class = task_from_string(TASK_NAME)
     dataset_class = task_class.dataset_class()
 
     data_split = dataset_class.default_dataset_split()
     dataset_root = zarr.open(PATH_TO_DATA, 'r')
-    stats = dataset_class.calculate_train_stats(dataset_root, data_split["train"])
+    stats = dataset_class.calculate_train_stats(dataset_root, data_split["train"], NORMALIZER)
 
     for split_type, split_indexes in data_split.items():
 
@@ -33,7 +34,8 @@ def main():
             pred_horizon=16,
             obs_horizon=2,
             action_horizon=8,
-            stats=stats)
+            stats=stats,
+            normalizer=NORMALIZER)
         
         dataloader = torch.utils.data.DataLoader(
             dataset,

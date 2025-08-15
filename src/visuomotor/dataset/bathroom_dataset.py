@@ -3,7 +3,7 @@ from typing import Dict, List
 import torch
 import numpy as np
 
-from visuomotor.dataset.tool import normalize_data, get_data_stats
+from visuomotor.dataset.tool import Normalizer
 from visuomotor.dataset.tool2 import get_lazy_sample, sample_indices
 
 
@@ -15,8 +15,11 @@ class BathroomDataset(torch.utils.data.Dataset):
             pred_horizon: int,
             obs_horizon: int,
             action_horizon: int,
-            stats: Dict[str, np.array]
+            stats: Dict[str, np.array],
+            normalizer: Normalizer
     ):
+        self.normalizer = normalizer
+
         self.image_keys = ["realsense", "depth_camera"]
 
         realsense_data = dataset_root['data']['realsense'][:]
@@ -35,7 +38,7 @@ class BathroomDataset(torch.utils.data.Dataset):
         }
     
         for key, data in train_data.items():
-            normalized_train_data[key] = normalize_data(data, stats[key])
+            normalized_train_data[key] = self.normalizer.normalize_data(data, stats[key])
 
         episode_ends = dataset_root['meta']['episode_ends'][:]
 
@@ -93,7 +96,7 @@ class BathroomDataset(torch.utils.data.Dataset):
         return nsample
 
     @staticmethod
-    def calculate_stats(np_data, episode_ends, split_indexes):
+    def calculate_stats(np_data, episode_ends, split_indexes, normalizer: Normalizer):
         train = []
         data = np_data.tolist()
         for i in split_indexes:
@@ -102,17 +105,17 @@ class BathroomDataset(torch.utils.data.Dataset):
                 start_i = episode_ends[i - 1]
             end_i = episode_ends[i]
             train += data[start_i:end_i]
-        return get_data_stats(np.array(train))
+        return normalizer.get_data_stats(np.array(train))
     
     @staticmethod
-    def calculate_train_stats(dataset_root, split_indexes):
+    def calculate_train_stats(dataset_root, split_indexes, normalizer: Normalizer):
         episode_ends = dataset_root['meta']['episode_ends'][:]
 
         n_wrist_pos = BathroomDataset._get_wrist_pos(dataset_root)
         n_action_pos = BathroomDataset._get_action_pos(dataset_root)
         train_stats = {
-            'wrist_pos': BathroomDataset.calculate_stats(n_wrist_pos, episode_ends, split_indexes),
-            'action_pos': BathroomDataset.calculate_stats(n_action_pos, episode_ends, split_indexes)
+            'wrist_pos': BathroomDataset.calculate_stats(n_wrist_pos, episode_ends, split_indexes, normalizer),
+            'action_pos': BathroomDataset.calculate_stats(n_action_pos, episode_ends, split_indexes, normalizer)
         }
         return train_stats
     

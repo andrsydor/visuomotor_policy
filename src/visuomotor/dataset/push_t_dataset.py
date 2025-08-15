@@ -5,7 +5,7 @@ import numpy as np
 
 from visuomotor.config.base_policy_config import BasePolicyConfig
 from visuomotor.dataset.dataset_base_config import DatasetBaseConfig
-from visuomotor.dataset.tool import normalize_data, create_sample_indices, sample_sequence, get_data_stats
+from visuomotor.dataset.tool import _normalize_data, create_sample_indices, sample_sequence, _get_data_stats
 
 
 class PushTImageDatasetConfig(DatasetBaseConfig):
@@ -37,7 +37,7 @@ class PushTImageDataset(torch.utils.data.Dataset):
 
         normalized_train_data = dict()
         for key, data in train_data.items():
-            normalized_train_data[key] = normalize_data(data, stats[key])
+            normalized_train_data[key] = _normalize_data(data, stats[key])
 
         # TODO: check if normalized images
         normalized_train_data['image'] = train_image_data
@@ -93,7 +93,7 @@ class PushTImageDataset(torch.utils.data.Dataset):
                 start_i = episode_ends[i - 1]
             end_i = episode_ends[i]
             train += data[start_i:end_i]
-        return get_data_stats(np.array(train))
+        return _get_data_stats(np.array(train))
     
     @staticmethod
     def calculate_train_stats(dataset_root, split_indexes):
@@ -104,7 +104,6 @@ class PushTImageDataset(torch.utils.data.Dataset):
         }
         return train_stats
     
-
     @staticmethod
     def default_dataset_split():
         return { 

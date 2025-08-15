@@ -1,7 +1,5 @@
 import time
 import argparse
-from typing import Tuple
-import os
 
 import torch
 from torch import nn
@@ -10,9 +8,16 @@ from diffusers.optimization import get_scheduler
 import numpy as np
 from tqdm.auto import tqdm
 
+from visuomotor.dataset.tool import MinMaxNormalizer, PercentileNormalizer
 from visuomotor.config.diffusion_policy_config import DiffusionPolicyConfig, DiffusionPolicy2CamConfig
 from visuomotor.policy.diffusion_policy import DiffusionPolicy2, DiffusionPolicy2Cam
-from visuomotor.pipeline.tools import validate_model, validate_model_2_cam, draw_chart, save_model, create_dataloaders, save_train_data
+from visuomotor.pipeline.tools import validate_model, validate_model_2_cam, save_model, create_dataloaders, save_train_data
+
+
+NORMALIZERS = {
+    "min_max": MinMaxNormalizer,
+    "percentile": PercentileNormalizer
+}
 
 
 POLICIES = {
@@ -39,6 +44,7 @@ def main():
     parser.add_argument("--batch_size", type=int, help="Batch_size")
     parser.add_argument("--policy", help="Policy name")
     parser.add_argument("--intermediate", type=int, nargs="+", help="List of intermediate checkpoints to be saved (epoch_i + 1)")
+    parser.add_argument("--normalizer", type=str, choices=NORMALIZERS.keys(), required=True, help="Policy name")
     args = parser.parse_args()
 
     PATH_TO_DATA = args.dataset
@@ -48,6 +54,7 @@ def main():
     BATCH_SIZE = args.batch_size
     EPOCHS = args.epochs
     INTERMEDIATE = args.intermediate
+    CHOSEN_NORMALIZER = NORMALIZERS[args.normalizer]
 
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -55,13 +62,14 @@ def main():
     CONFIG = policy_config_class()
     policy = policy_class(CONFIG, DEVICE)
 
-    train_dataloader, validation_dataloader, test_dataloader = create_dataloaders(
+    train_dataloader, validation_dataloader, test_dataloader, stats = create_dataloaders(
         TASK_NAME,
         PATH_TO_DATA,
         BATCH_SIZE,
         CONFIG.pred_horizon,
         CONFIG.obs_horizon,
-        CONFIG.action_horizon
+        CONFIG.action_horizon,
+        CHOSEN_NORMALIZER
     )
 
     ema = EMAModel(
@@ -142,6 +150,8 @@ def main():
 
     save_train_data(
         {
+            "stats_type": args.normalizer,
+            "stats": str(stats),
             "epoch_losses": epoch_losses,
             "validation_losses": validation_losses,
             "test_mse": test_mse,

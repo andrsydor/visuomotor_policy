@@ -52,7 +52,7 @@ def sample_sequence(train_data, sequence_length,
     return result
 
 
-def get_data_stats(data):
+def _get_data_stats(data):
     data = data.reshape(-1,data.shape[-1])
     stats = {
         'min': np.min(data, axis=0),
@@ -61,7 +61,7 @@ def get_data_stats(data):
     return stats
 
 
-def normalize_data(data, stats):
+def _normalize_data(data, stats):
     # nomalize to [0,1]
     ndata = (data - stats['min']) / (stats['max'] - stats['min'])
     # normalize to [-1, 1]
@@ -69,7 +69,74 @@ def normalize_data(data, stats):
     return ndata
 
 
-def unnormalize_data(ndata, stats):
+def _unnormalize_data(ndata, stats):
     ndata = (ndata + 1) / 2
     data = ndata * (stats['max'] - stats['min']) + stats['min']
     return data
+
+
+class Normalizer:
+    @staticmethod
+    def get_data_stats(data):
+        raise NotImplementedError("should be implemented in child class")
+    
+    @staticmethod
+    def normalize_data(data, stats):
+        raise NotImplementedError("should be implemented in child class")
+    
+    @staticmethod
+    def unnormalize_data(ndata, stats):
+        raise NotImplementedError("should be implemented in child class")
+
+
+class MinMaxNormalizer(Normalizer):
+    @staticmethod
+    def get_data_stats(data):
+        data = data.reshape(-1, data.shape[-1])
+        stats = {
+            'min': np.min(data, axis=0),
+            'max': np.max(data, axis=0)
+        }
+        return stats
+    
+    @staticmethod
+    def normalize_data(data, stats):
+        # nomalize to [0,1]
+        ndata = (data - stats['min']) / (stats['max'] - stats['min'])
+        # normalize to [-1, 1]
+        ndata = ndata * 2 - 1
+        return ndata
+
+    @staticmethod
+    def unnormalize_data(ndata, stats):
+        ndata = (ndata + 1) / 2
+        data = ndata * (stats['max'] - stats['min']) + stats['min']
+        return data
+
+
+class PercentileNormalizer(Normalizer):
+    @staticmethod
+    def get_data_stats(data):
+        data = data.reshape(-1, data.shape[-1])
+        stats = {
+            'x_02': np.percentile(data, 2, axis=0),
+            'x_98': np.percentile(data, 98, axis=0)
+        }
+        return stats
+    
+    @staticmethod
+    def normalize_data(data, stats):
+        # ~[0, 1]
+        ndata = (data - stats['x_02']) / (stats['x_98'] - stats['x_02'])
+        # ~[-1, 1]
+        ndata = ndata * 2 - 1
+        # clamp [-1.5, 1.5]
+        ndata = np.clip(ndata, -1.5, 1.5)
+        return ndata
+
+    @staticmethod
+    def unnormalize_data(ndata, stats):
+        # ndata = np.clip(ndata, -1.5, 1.5)
+        ndata = (ndata + 1) / 2
+        data = ndata * (stats['x_98'] - stats['x_02']) + stats['x_02']
+        return data

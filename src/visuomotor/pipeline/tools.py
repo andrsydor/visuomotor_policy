@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import zarr
 
+from visuomotor.dataset.tool import Normalizer
 from visuomotor.config.base_policy_config import BasePolicyConfig
 from visuomotor.task.components import task_from_string
 
@@ -113,7 +114,8 @@ def create_dataloaders(
     batch_size: int,
     pred_horizon: int,
     obs_horizon: int,
-    action_horizon: int
+    action_horizon: int,
+    normalizer: Normalizer
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
 
     # train, val, test
@@ -123,7 +125,7 @@ def create_dataloaders(
 
     data_split = dataset_class.default_dataset_split()
     dataset_root = zarr.open(path_to_data, 'r')
-    stats = dataset_class.calculate_train_stats(dataset_root, data_split["train"])
+    stats = dataset_class.calculate_train_stats(dataset_root, data_split["train"], normalizer)
 
     train_dataset = dataset_class(
         dataset_root=dataset_root,
@@ -131,7 +133,9 @@ def create_dataloaders(
         pred_horizon=pred_horizon,
         obs_horizon=obs_horizon,
         action_horizon=action_horizon,
-        stats=stats)
+        stats=stats,
+        normalizer=normalizer
+    )
         
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
@@ -148,7 +152,9 @@ def create_dataloaders(
         pred_horizon=pred_horizon,
         obs_horizon=obs_horizon,
         action_horizon=action_horizon,
-        stats=stats)
+        stats=stats,
+        normalizer=normalizer
+    )
         
     validation_dataloader = torch.utils.data.DataLoader(
         validation_dataset,
@@ -165,7 +171,9 @@ def create_dataloaders(
         pred_horizon=pred_horizon,
         obs_horizon=obs_horizon,
         action_horizon=action_horizon,
-        stats=stats)
+        stats=stats,
+        normalizer=normalizer
+    )
         
     test_dataloader = torch.utils.data.DataLoader(
         test_dataset,
@@ -176,7 +184,7 @@ def create_dataloaders(
         persistent_workers=True
     )
 
-    return train_dataloader, validation_dataloader, test_dataloader
+    return train_dataloader, validation_dataloader, test_dataloader, stats
 
 
 def save_train_data(data, path_to_storage, name_to_save):
