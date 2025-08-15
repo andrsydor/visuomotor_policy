@@ -1,5 +1,6 @@
 import os
 from typing import Tuple
+import json
 
 import numpy as np
 import torch
@@ -46,6 +47,35 @@ def validate_model(policy, dataloader, config: BasePolicyConfig, device, functio
       noise = torch.randn(naction.shape, device=device)
       noisy_actions = policy.forward_process(naction, noise, t)
       noise_pred = policy.predict_noise(nimage, npos, noisy_actions, t)
+
+      loss = function(noise_pred, noise)
+      loss_cpu = loss.item()
+      losses.append(loss_cpu)
+  mean_loss = np.mean(losses)
+  policy.nets.train()
+  return mean_loss
+
+
+def validate_model_2_cam(policy, dataloader, config: BasePolicyConfig, device, function=nn.functional.mse_loss):
+  policy.nets.eval()
+  losses = []
+  with torch.no_grad():
+    for nbatch in dataloader:
+      arm_images = nbatch['realsense'].float().to(device)
+      depth_images = nbatch['depth_camera'].float().to(device)
+
+      poses = torch.cat([nbatch["wrist_pos"], nbatch["wrist_rot"]], dim=2)
+      poses = poses.float().to(device)
+
+      naction = torch.cat([nbatch["action_pos"], nbatch["action_rot"]], dim=2)
+      naction = naction.float().to(device)
+
+      B = poses.shape[0]
+
+      t = policy.sample_t(B)
+      noise = torch.randn(naction.shape, device=device)
+      noisy_actions = policy.forward_process(naction, noise, t)
+      noise_pred = policy.predict_noise(arm_images, depth_images, poses, noisy_actions, t)
 
       loss = function(noise_pred, noise)
       loss_cpu = loss.item()
@@ -147,3 +177,9 @@ def create_dataloaders(
     )
 
     return train_dataloader, validation_dataloader, test_dataloader
+
+
+def save_train_data(data, path_to_storage, name_to_save):
+    path = os.path.join(path_to_storage, name_to_save + ".json")
+    with open(path, "w") as json_file:
+        json.dump(data, json_file)

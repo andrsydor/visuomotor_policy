@@ -1,6 +1,7 @@
 import time
 import argparse
 from typing import Tuple
+import os
 
 import torch
 from torch import nn
@@ -11,12 +12,12 @@ from tqdm.auto import tqdm
 
 from visuomotor.config.diffusion_policy_config import DiffusionPolicyConfig, DiffusionPolicy2CamConfig
 from visuomotor.policy.diffusion_policy import DiffusionPolicy2, DiffusionPolicy2Cam
-from visuomotor.pipeline.tools import validate_model, draw_chart, save_model, create_dataloaders
+from visuomotor.pipeline.tools import validate_model, validate_model_2_cam, draw_chart, save_model, create_dataloaders, save_train_data
 
 
 POLICIES = {
-    "dp": (DiffusionPolicy2, DiffusionPolicyConfig),
-    "dp2cam": (DiffusionPolicy2Cam, DiffusionPolicy2CamConfig)
+    "dp": (DiffusionPolicy2, DiffusionPolicyConfig, validate_model),
+    "dp2cam": (DiffusionPolicy2Cam, DiffusionPolicy2CamConfig, validate_model_2_cam)
 }
 
 
@@ -48,7 +49,7 @@ def main():
 
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-    policy_class, policy_config_class = choose_policy(args.policy)
+    policy_class, policy_config_class, validation_function = choose_policy(args.policy)
     CONFIG = policy_config_class()
     policy = policy_class(CONFIG, DEVICE)
 
@@ -118,17 +119,29 @@ def main():
             mean_loss = np.mean(epoch_loss)
             epoch_losses.append(mean_loss)
             tepochs.set_postfix(loss=np.mean(mean_loss))
-            # validation_loss = validate_model(policy, validation_dataloader, CONFIG, DEVICE)
-            # validation_losses.append(validation_loss)
-            # print(f'epoch {epoch_i}: train_loss={mean_loss}, validation_loss={validation_loss}')
-            print(f'epoch {epoch_i}: train_loss={mean_loss}')
+            validation_loss = validation_function(policy, validation_dataloader, CONFIG, DEVICE)
+            validation_losses.append(validation_loss)
+            print(f'epoch {epoch_i}: train_loss={mean_loss}, validation_loss={validation_loss}')
 
     ema_policy = policy_class.from_ema(CONFIG, DEVICE, ema)
     save_model(ema_policy.nets, PATH_TO_STORAGE, NAME_TO_SAVE)
     print(f'saved as {NAME_TO_SAVE}')
-    # draw_chart(epoch_losses, validation_losses)  # TODO: save the chart
-    # print('test noise MSE: ', validate_model(policy, test_dataloader, CONFIG, DEVICE, nn.functional.mse_loss))
-    # print('test noise MAE: ', validate_model(policy, test_dataloader, CONFIG, DEVICE, nn.functional.l1_loss))
+
+    test_mse = validation_function(policy, test_dataloader, CONFIG, DEVICE, nn.functional.mse_loss)
+    test_mae = validation_function(policy, test_dataloader, CONFIG, DEVICE, nn.functional.l1_loss)
+    print('test noise MSE: ', test_mse)
+    print('test noise MAE: ', test_mae)
+
+    save_train_data(
+        {
+            "epoch_losses": epoch_losses,
+            "validation_losses": validation_losses,
+            "test_mse": test_mse,
+            "test_mae": test_mae
+        },
+        PATH_TO_STORAGE,
+        NAME_TO_SAVE
+    )
 
 
 if __name__ == "__main__":
