@@ -140,3 +140,64 @@ class PercentileNormalizer(Normalizer):
         ndata = (ndata + 1) / 2
         data = ndata * (stats['x_98'] - stats['x_02']) + stats['x_02']
         return data
+
+
+def pos_rot_to_mat(pos, rot):
+    """
+    Args:
+        pos: (..., 3)
+        rot: (..., 3, 3)
+    Returns:
+        (..., 4, 4).
+    """
+    pos_flat, rot_flat = pos.reshape(-1, pos.shape[-1]), rot.reshape(-1, rot.shape[-1])
+    rot_mat = rot_flat.reshape(rot_flat.shape[0], 3, 3)
+    n = pos_flat.shape[0]
+    result = np.zeros((n, 4, 4), dtype=pos.dtype)
+    result[..., :3, 3] = pos_flat
+    result[..., :3, :3] = rot_mat
+    result[..., 3, 3] = 1.0
+    return result.reshape(*pos.shape[:-1], 4, 4)
+
+
+def mat_to_pos_rot(mat):
+    """
+    Args:
+        mat: (..., 4, 4).
+    Returns:
+        ((..., 3), (..., 3, 3)).
+    """
+    pos = (mat[..., :3, 3].T / mat[..., 3, 3].T).T
+    rot = mat[..., :3, :3]
+    rot = rot.reshape(*rot.shape[:-2], -1)
+    return pos, rot
+
+
+def rel_pose(poses_mat, base_pose_mat):
+    """
+    Args:
+        poses_mat: (b, horizon, 4, 4).
+        base_pose_mat: (b, 1, 4, 4).
+    Returns:
+        (b, horizon, 4, 4).
+    """
+    assert len(poses_mat.shape) == 4  # (b, horizon, 4, 4)
+    b = poses_mat.shape[0]
+    assert base_pose_mat.shape == (b, 1, 4, 4)
+    result = np.linalg.inv(base_pose_mat) @ poses_mat
+    return result
+
+
+def apply_rel_pose(base_pose_mat, rel_poses_mat):
+    """
+    Args:
+        base_pose_mat: (b, 1, 4, 4).
+        rel_poses_mat: (b, horizon, 4, 4).
+    Returns:
+        (b, horizon, 4, 4).
+    """
+    assert len(rel_poses_mat.shape) == 4  # (b, horizon, 4, 4)
+    b = rel_poses_mat.shape[0]
+    assert base_pose_mat.shape == (b, 1, 4, 4)
+    poses_mat = base_pose_mat @ rel_poses_mat
+    return poses_mat
