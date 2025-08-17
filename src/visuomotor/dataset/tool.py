@@ -1,6 +1,7 @@
 from typing import List
 
 import numpy as np
+import torch
 
 
 def create_sample_indices(
@@ -146,14 +147,21 @@ def pos_rot_to_mat(pos, rot):
     """
     Args:
         pos: (..., 3)
-        rot: (..., 3, 3)
+        rot: (..., 9)
     Returns:
         (..., 4, 4).
     """
     pos_flat, rot_flat = pos.reshape(-1, pos.shape[-1]), rot.reshape(-1, rot.shape[-1])
     rot_mat = rot_flat.reshape(rot_flat.shape[0], 3, 3)
     n = pos_flat.shape[0]
-    result = np.zeros((n, 4, 4), dtype=pos.dtype)
+
+    if isinstance(pos, np.ndarray) and isinstance(rot, np.ndarray):
+        result = np.zeros((n, 4, 4), dtype=pos.dtype)
+    elif isinstance(pos, torch.Tensor) and isinstance(rot, torch.Tensor):
+        result = torch.zeros((n, 4, 4), dtype=pos.dtype, device=pos.device)
+    else:
+        raise NotImplementedError("Unexpected input type")
+
     result[..., :3, 3] = pos_flat
     result[..., :3, :3] = rot_mat
     result[..., 3, 3] = 1.0
@@ -165,7 +173,7 @@ def mat_to_pos_rot(mat):
     Args:
         mat: (..., 4, 4).
     Returns:
-        ((..., 3), (..., 3, 3)).
+        ((..., 3), (..., 9)).
     """
     pos = (mat[..., :3, 3].T / mat[..., 3, 3].T).T
     rot = mat[..., :3, :3]
@@ -201,3 +209,37 @@ def apply_rel_pose(base_pose_mat, rel_poses_mat):
     assert base_pose_mat.shape == (b, 1, 4, 4)
     poses_mat = base_pose_mat @ rel_poses_mat
     return poses_mat
+
+
+def calculate_rel_pos_and_rot(pos, rot, base_pos, base_rot):
+    """
+    Args:
+        pos: (b, horizon, 3).
+        rot: (b, horizon, 9).
+        base_pos: (b, 1, 3).
+        base_rot: (b, 1, 9).
+    Returns:
+        ((b, horizon, 3), (b, horizon, 9)).
+    """
+    batch_mat = pos_rot_to_mat(pos, rot)
+    base_mat = pos_rot_to_mat(base_pos, base_rot)
+    rel_mat = rel_pose(batch_mat, base_mat)
+    rel_pos, rel_rot = mat_to_pos_rot(rel_mat)
+    return rel_pos, rel_rot
+
+
+def abs_pos_and_rot(rel_pos, rel_rot, base_pos, base_rot):
+    """
+    Args:
+        pos: (b, horizon, 3).
+        rot: (b, horizon, 9).
+        base_pos: (b, 1, 3).
+        base_rot: (b, 1, 9).
+    Returns:
+        ((b, horizon, 3), (b, horizon, 9)).
+    """
+    rel_mat = pos_rot_to_mat(rel_pos, rel_rot)
+    base_mat = pos_rot_to_mat(base_pos, base_rot)
+    mat = apply_rel_pose(base_mat, rel_mat)
+    pos, rot = mat_to_pos_rot(mat)
+    return pos, rot

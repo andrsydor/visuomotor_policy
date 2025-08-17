@@ -8,10 +8,16 @@ from diffusers.optimization import get_scheduler
 import numpy as np
 from tqdm.auto import tqdm
 
-from visuomotor.dataset.tool import MinMaxNormalizer, PercentileNormalizer
+from visuomotor.dataset.tool import MinMaxNormalizer, PercentileNormalizer, calculate_rel_pos_and_rot
 from visuomotor.config.diffusion_policy_config import DiffusionPolicyConfig, DiffusionPolicy2CamConfig
 from visuomotor.policy.diffusion_policy import DiffusionPolicy2, DiffusionPolicy2Cam
 from visuomotor.pipeline.tools import validate_model, validate_model_2_cam, save_model, create_dataloaders, save_train_data
+
+
+ACTION_TYPES = {
+    "abs": "abs",
+    "rel": "rel"
+}
 
 
 NORMALIZERS = {
@@ -45,6 +51,7 @@ def main():
     parser.add_argument("--policy", help="Policy name")
     parser.add_argument("--intermediate", type=int, nargs="+", help="List of intermediate checkpoints to be saved (epoch_i + 1)")
     parser.add_argument("--normalizer", type=str, choices=NORMALIZERS.keys(), required=True, help="Policy name")
+    parser.add_argument("--action_type", type=str, choices=ACTION_TYPES.keys(), required=True, help="Type of action representation")
     args = parser.parse_args()
 
     PATH_TO_DATA = args.dataset
@@ -55,6 +62,7 @@ def main():
     EPOCHS = args.epochs
     INTERMEDIATE = args.intermediate
     CHOSEN_NORMALIZER = NORMALIZERS[args.normalizer]
+    ACTION_T = args.action_type
 
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -107,10 +115,19 @@ def main():
                     arm_images = nbatch['realsense'].float().to(DEVICE)
                     depth_images = nbatch['depth_camera'].float().to(DEVICE)
 
-                    poses = torch.cat([nbatch["wrist_pos"], nbatch["wrist_rot"]], dim=2)
+                    wrist_pos = nbatch["wrist_pos"]
+                    wrist_rot = nbatch["wrist_rot"]
+                    action_pos = nbatch["action_pos"]
+                    action_rot = nbatch["action_rot"]
+
+                    if ACTION_T == ACTION_TYPES["rel"]:
+                        wrist_pos, wrist_rot = calculate_rel_pos_and_rot(wrist_pos, wrist_rot, nbatch["wrist_pos"][:, -1:, :], nbatch["wrist_rot"][:, -1:, :])
+                        action_pos, action_rot = calculate_rel_pos_and_rot(action_pos, action_rot, nbatch["wrist_pos"][:, -1:, :], nbatch["wrist_rot"][:, -1:, :])
+
+                    poses = torch.cat([wrist_pos, wrist_rot], dim=2)
                     poses = poses.float().to(DEVICE)
 
-                    target_actions = torch.cat([nbatch["action_pos"], nbatch["action_rot"]], dim=2)
+                    target_actions = torch.cat([action_pos, action_rot], dim=2)
                     target_actions = target_actions.float().to(DEVICE)
 
                     loss = policy.compute_train_loss(arm_images, depth_images, poses, target_actions)
@@ -150,6 +167,7 @@ def main():
 
     save_train_data(
         {
+            "action_type": ACTION_T,
             "stats_type": args.normalizer,
             "stats": str(stats),
             "epoch_losses": epoch_losses,
