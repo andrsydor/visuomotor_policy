@@ -1,2 +1,5 @@
 data
+checkpoints
 venv
+video
+**/__pycache__
