@@ -127,7 +127,7 @@ class DiffusionPolicy2Cam:
 
     _ = self.nets.to(device)
 
-    self.num_diffusion_iters = 100
+    self.num_diffusion_iters = 25
     self.noise_scheduler = DDPMScheduler(
         num_train_timesteps=self.num_diffusion_iters,
         beta_schedule='squaredcos_cap_v2',
