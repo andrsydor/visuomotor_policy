@@ -86,6 +86,10 @@ def validate_model_2_cam(policy, dataloader, config: BasePolicyConfig, device, f
   return mean_loss
 
 
+def empty_validate_model_2_cam(policy, dataloader, config: BasePolicyConfig, device, function=nn.functional.mse_loss):
+  return 0.0
+
+
 def calculate_error(policy, dataloader, config: BasePolicyConfig, device, function=nn.functional.mse_loss):
   policy.nets.eval()
   losses = []

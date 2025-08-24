@@ -11,7 +11,9 @@ from tqdm.auto import tqdm
 from visuomotor.dataset.tool import MinMaxNormalizer, PercentileNormalizer, calculate_rel_pos_and_rot
 from visuomotor.config.diffusion_policy_config import DiffusionPolicyConfig, DiffusionPolicy2CamConfig
 from visuomotor.policy.diffusion_policy import DiffusionPolicy2, DiffusionPolicy2Cam
-from visuomotor.pipeline.tools import validate_model, validate_model_2_cam, save_model, create_dataloaders, save_train_data
+from visuomotor.policy.explicit_policy import ExplicitPolicy
+from visuomotor.model.tools import construct_default_optimizer, construct_transformer_optimizer
+from visuomotor.pipeline.tools import validate_model, validate_model_2_cam, save_model, create_dataloaders, save_train_data, empty_validate_model_2_cam
 
 
 ACTION_TYPES = {
@@ -27,8 +29,9 @@ NORMALIZERS = {
 
 
 POLICIES = {
-    "dp": (DiffusionPolicy2, DiffusionPolicyConfig, validate_model),
-    "dp2cam": (DiffusionPolicy2Cam, DiffusionPolicy2CamConfig, validate_model_2_cam)
+    "dp": (DiffusionPolicy2, DiffusionPolicyConfig, validate_model, construct_default_optimizer),
+    "dp2cam": (DiffusionPolicy2Cam, DiffusionPolicy2CamConfig, validate_model_2_cam, construct_default_optimizer),
+    "at": (ExplicitPolicy, DiffusionPolicy2CamConfig, empty_validate_model_2_cam, construct_transformer_optimizer)
 }
 
 
@@ -66,7 +69,7 @@ def main():
 
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-    policy_class, policy_config_class, validation_function = choose_policy(args.policy)
+    policy_class, policy_config_class, validation_function, optim_creator = choose_policy(args.policy)
     CONFIG = policy_config_class()
     policy = policy_class(CONFIG, DEVICE)
 
@@ -84,9 +87,7 @@ def main():
         parameters=policy.nets.parameters(),
         power=0.75)
 
-    optimizer = torch.optim.AdamW(
-        params=policy.nets.parameters(),
-        lr=1e-4, weight_decay=1e-6)
+    optimizer = optim_creator(policy)
 
     lr_scheduler = get_scheduler(
         name='cosine',
