@@ -128,7 +128,9 @@ class BathroomDataset(torch.utils.data.Dataset):
                 0, 1, 2, 3, 4, 5, 6, 7, 8
             ],
             "valid" : [
+                0
             ],
             "test" : [
+                1
             ]
         }
